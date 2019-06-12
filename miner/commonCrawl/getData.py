@@ -54,6 +54,7 @@ def saveContent(pages, saveTo):
 
 
 if __name__ == "__main__":
-    pages = getIndex(crawl="CC-MAIN-2019-22", url="https://example.com")
-    saveContent(pages = pages, saveTo = "data")
+    pages = getIndex(crawl="CC-MAIN-2019-22", url="example.com")
+    print(pages)
+    #saveContent(pages = pages, saveTo = "data")
 
