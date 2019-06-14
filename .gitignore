@@ -1,3 +1,7 @@
 data/*
 *.pdf
 *.db
+*.html
+*.txt
+*.pdf
+*.xml
