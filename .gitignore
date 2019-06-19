@@ -1,4 +1,5 @@
 data/*
+aux.go
 *.pdf
 *.db
 *.html
