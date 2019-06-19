@@ -1,4 +1,4 @@
-package main
+package db
 
 //Industries ... Industried by `Thomson Reuters Business Classification` and number of files belonging to them
 type Industries struct {
