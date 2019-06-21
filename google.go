@@ -13,6 +13,15 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+// GoogleResultChan ... result of work of `FetchURLFiles` function
+type GoogleResultChan struct {
+	URL      string
+	Progress int
+	Total    int
+	Error    error
+}
+
+// GoogleResult ... Result of Google search
 type GoogleResult struct {
 	ResultRank  int
 	ResultURL   string
@@ -27,7 +36,7 @@ var googleDomains = map[string]string{
 	"fr":  "https://www.google.fr/search?q=",
 }
 
-var UserAgents = []string{
+var userAgents = []string{
 	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36",
 	"Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36",
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36",
@@ -36,7 +45,7 @@ var UserAgents = []string{
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Safari/604.1.38",
 }
 
-func buildGoogleUrl(searchTerm string, countryCode string, languageCode string) string {
+func buildGoogleURL(searchTerm string, countryCode string, languageCode string) string {
 	searchTerm = strings.Trim(searchTerm, " ")
 	searchTerm = strings.Replace(searchTerm, " ", "+", -1)
 	if googleBase, found := googleDomains[countryCode]; found {
@@ -46,16 +55,10 @@ func buildGoogleUrl(searchTerm string, countryCode string, languageCode string) 
 	}
 }
 
-func RandomOption(options []string) string {
-	rand.Seed(time.Now().Unix())
-	randNum := rand.Int() % len(options)
-	return options[randNum]
-}
-
 func googleRequest(searchURL string) (*http.Response, error) {
 	baseClient := &http.Client{}
 	req, _ := http.NewRequest("GET", searchURL, nil)
-	req.Header.Set("User-Agent", RandomOption(UserAgents))
+	req.Header.Set("User-Agent", randomOption(userAgents))
 
 	res, err := baseClient.Do(req)
 
@@ -97,8 +100,9 @@ func googleResultParser(response *http.Response) ([]GoogleResult, error) {
 	return results, err
 }
 
+// GoogleScrape ...
 func GoogleScrape(searchTerm string, countryCode string, languageCode string) ([]GoogleResult, error) {
-	googleUrl := buildGoogleUrl(searchTerm, countryCode, languageCode)
+	googleUrl := buildGoogleURL(searchTerm, countryCode, languageCode)
 	res, err := googleRequest(googleUrl)
 	if err != nil {
 		return nil, err
@@ -149,32 +153,24 @@ func DownloadFile(saveto string, extension string, url string, maxMegabytes uint
 }
 
 // FetchURLFiles ...
-func FetchURLFiles(url string, extension string, saveto string, maxMegabytes uint64) error {
-
-	// Create directory if not exists
-	if _, err := os.Stat(saveto); os.IsNotExist(err) {
-		err := os.Mkdir(saveto, os.ModeDir)
-		if err != nil {
-			return fmt.Errorf("[FetchURLFiles] error: %v", err)
-		}
-	}
-
+func FetchURLFiles(url string, extension string, saveto string, maxMegabytes uint64, resultChan chan GoogleResultChan) {
 	// Query google
 	query := fmt.Sprintf("site:%v filetype:%v", url, extension)
 	res, err := GoogleScrape(query, "ru", "RU")
 	if err != nil {
-		return fmt.Errorf("[FetchURLFiles] error: %v", err)
+		resultChan <- GoogleResultChan{Error: fmt.Errorf("[FetchURLFiles] error: %v", err), URL: url}
+		return
 	}
 
 	// Download found files
 	for i, r := range res {
 		DownloadFile(saveto, extension, r.ResultURL, maxMegabytes)
 		if err != nil {
-			return fmt.Errorf("[FetchURLFiles] error: %v", err)
+			resultChan <- GoogleResultChan{Error: fmt.Errorf("[FetchURLFiles] error: %v", err), URL: url}
+			return
 		}
-		fmt.Printf("Donwnloading %v: %v/%v\n", url, i+1, len(res))
+		resultChan <- GoogleResultChan{URL: url, Total: len(res), Progress: i + 1}
 	}
-	return nil
 }
 
 func randString(len int) string {
@@ -183,4 +179,10 @@ func randString(len int) string {
 		bytes[i] = byte(65 + rand.Intn(25)) //A=65 and Z = 65+25
 	}
 	return string(bytes)
+}
+
+func randomOption(options []string) string {
+	rand.Seed(time.Now().Unix())
+	randNum := rand.Int() % len(options)
+	return options[randNum]
 }

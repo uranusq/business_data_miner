@@ -11,7 +11,7 @@ import (
 func ExtensionByContent(content []byte) string {
 	contentType := http.DetectContentType([]byte(content))
 	splitted := strings.Split(contentType, "; ")[0]
-	extenstions := map[string]string{"text/xml": ".xml", "text/html": ".html", "image/jpeg": ".jpeg", "application/pdf": ".pdf", "text/plain": ".txt"}
+	extenstions := map[string]string{"text/xml": ".xml", "text/html": ".html", "application/pdf": ".pdf", "text/plain": ".txt", "application/msword": ".doc"}
 	if extenstions[splitted] == "" {
 		log.Println("[extensionByContent] No extension for " + splitted)
 		return ".none"
