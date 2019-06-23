@@ -4,11 +4,9 @@ package main
 import (
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -19,6 +17,7 @@ type GoogleResultChan struct {
 	Progress int
 	Total    int
 	Error    error
+	Done     bool
 }
 
 // GoogleResult ... Result of Google search
@@ -94,7 +93,7 @@ func googleResultParser(response *http.Response) ([]GoogleResult, error) {
 				desc,
 			}
 			results = append(results, result)
-			rank += 1
+			rank++
 		}
 	}
 	return results, err
@@ -102,17 +101,17 @@ func googleResultParser(response *http.Response) ([]GoogleResult, error) {
 
 // GoogleScrape ...
 func GoogleScrape(searchTerm string, countryCode string, languageCode string) ([]GoogleResult, error) {
-	googleUrl := buildGoogleURL(searchTerm, countryCode, languageCode)
-	res, err := googleRequest(googleUrl)
+	googleURL := buildGoogleURL(searchTerm, countryCode, languageCode)
+	res, err := googleRequest(googleURL)
 	if err != nil {
 		return nil, err
 	}
 	scrapes, err := googleResultParser(res)
 	if err != nil {
 		return nil, err
-	} else {
-		return scrapes, nil
 	}
+	return scrapes, nil
+
 }
 
 // DownloadFile will download a url to a local file. It's efficient because it will
@@ -171,18 +170,5 @@ func FetchURLFiles(url string, extension string, saveto string, maxMegabytes uin
 		}
 		resultChan <- GoogleResultChan{URL: url, Total: len(res), Progress: i + 1}
 	}
-}
-
-func randString(len int) string {
-	bytes := make([]byte, len)
-	for i := 0; i < len; i++ {
-		bytes[i] = byte(65 + rand.Intn(25)) //A=65 and Z = 65+25
-	}
-	return string(bytes)
-}
-
-func randomOption(options []string) string {
-	rand.Seed(time.Now().Unix())
-	randNum := rand.Int() % len(options)
-	return options[randNum]
+	resultChan <- GoogleResultChan{URL: url, Done: true}
 }

@@ -17,7 +17,7 @@ type Companies struct {
 	URL             string `gorm:"unique;not null"`
 	Name            string
 	IsCommonCrawled bool   `gorm:"default:0"`
-	IsGoogleFilter  bool   `gorm:"default:0"`
+	IsGoogleCrawled bool   `gorm:"default:0"`
 	IsCollyCrawled  bool   `gorm:"default:0"`
 	NumDocs         *uint  `gorm:"default:0"`
 	NumHTML         *uint  `gorm:"default:0"`

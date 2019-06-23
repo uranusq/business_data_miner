@@ -2,27 +2,28 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
-	"log"
-	"os"
-	"sync"
 	"time"
 
 	"github.com/gocolly/colly"
 )
 
+// CollyResultChan ... result of work of `CrawlSite` function
+type CollyResultChan struct {
+	URL   string
+	Error error
+	Done  bool
+}
+
 // CrawlSite ... Crawl choosen URL and saves found files
-func CrawlSite(urlSite string, allowedDomains []string, saveto string, maxMB float32, maxLoad uint, workMinutes time.Duration, wg *sync.WaitGroup) {
-	f := logToFile(saveto)
-	defer f.Close()
-	defer wg.Done()
+func CrawlSite(urlSite string, saveto string, maxMB float32, maxLoad uint, workMinutes time.Duration, resultChan chan CollyResultChan) {
+	url := "https://" + urlSite
 
 	var loadedSize uint
 	maxLoadSize := maxLoad * 1024
 	waitTime := time.Minute * workMinutes
-
+	exit := false
 	c := colly.NewCollector()
-	c.AllowedDomains = allowedDomains
+	c.AllowedDomains = []string{"*." + urlSite, urlSite}
 	// Reduce maximum response body size to 1M
 	size := int(1024 * 1024 * maxMB)
 	c.MaxBodySize = size
@@ -33,42 +34,31 @@ func CrawlSite(urlSite string, allowedDomains []string, saveto string, maxMB flo
 	})
 
 	c.OnRequest(func(r *colly.Request) {
-		log.Println("[Visiting]", r.URL.String())
+		//fmt.Println("[Visiting]", r.URL.String())
 	})
 	c.OnError(func(_ *colly.Response, err error) {
-		log.Printf("Something went wrong: %v\n", err)
+		resultChan <- CollyResultChan{URL: url, Error: err}
 	})
 
 	start := time.Now()
 	c.OnResponse(func(r *colly.Response) {
 		elapsed := time.Since(start)
 		ext := ExtensionByContent(r.Body)
-		if elapsed > waitTime {
-			fmt.Println(urlSite, " time end")
-			wg.Done()
+		if elapsed > waitTime && !exit {
+			fmt.Println(url, " time end")
+			resultChan <- CollyResultChan{URL: urlSite, Done: true}
+			exit = true
 			return
 		} else if ext == ".none" {
 			return
 		} else if loadedSize > maxLoadSize && ext != ".pdf" && ext != ".doc" {
-			fmt.Println(urlSite, " loaded: ", loadedSize)
 			return
 		}
 		filename := EscapeURL(r.Request.URL.EscapedPath())
-		ioutil.WriteFile(saveto+"/"+filename+ext, r.Body, 0644)
+		r.Save(saveto + "/" + filename + randString(6) + ext)
 		loadedSize += uint(len(r.Body) / 1024)
 	})
-	// From where scrapping starts
 
-	c.Visit(urlSite)
-	fmt.Println(urlSite, " finished")
-}
-
-func logToFile(location string) *os.File {
-	f, err := os.OpenFile(location+"/parselog.txt", os.O_RDWR|os.O_CREATE, 0666)
-	if err != nil {
-		log.Fatal("createLogFile error opening file: ", err)
-	}
-	log.SetOutput(f)
-	log.Println("Log started\n-------------------------------\n")
-	return f
+	c.Visit(url)
+	resultChan <- CollyResultChan{URL: urlSite, Done: true}
 }

@@ -1,7 +1,6 @@
 package db
 
 import (
-	"errors"
 	"fmt"
 	"log"
 
@@ -12,9 +11,9 @@ import (
 // Database ... Contains methods to work with data
 type Database struct {
 	*gorm.DB
-	busyCrawlIDs  []int
-	busyCollyIDs  []int
-	busyGoogleIDs []int
+	//busyCrawlIDs  []int
+	//busyCollyIDs  []int
+	//busyGoogleIDs []int
 }
 
 // OpenInitialize ... Open connection to DB and Initializes custom structure. Connection needs to be closed
@@ -28,11 +27,11 @@ func (db *Database) OpenInitialize(path string) {
 	gdb.AutoMigrate(&Industries{}, &Companies{})
 	db.DB = gdb
 	db.Exec("PRAGMA foreign_keys = ON;")
-
+	db.LogMode(false)
 	// Exclude 0 indexes, since they always have empty values in SQLite
-	db.busyCollyIDs = []int{0}
-	db.busyCrawlIDs = []int{0}
-	db.busyGoogleIDs = []int{0}
+	//db.busyCollyIDs = []int{0}
+	//db.busyCrawlIDs = []int{0}
+	//db.busyGoogleIDs = []int{0}
 }
 
 // PrintInfo ... Prints basic info about items in database
@@ -44,12 +43,17 @@ func (db *Database) PrintInfo() {
 	companies := []Companies{}
 	db.Find(&companies)
 	fmt.Println("Companies in DB: ", len(companies))
+
+	fmt.Println("Not crawled:")
+	common := db.GetCommon()
+	fmt.Println(" Common crawl: ", len(common))
+	google := db.GetGoogle()
+	fmt.Println(" Google filter: ", len(google))
+	colly := db.GetColly()
+	fmt.Println(" Colly crawler: ", len(colly))
 }
 
-func (db *Database) GetCrawlURL() {
-
-}
-
+/*
 func (db *Database) GetCollyURL() (string, error) {
 	company := Companies{}
 	db.Where("id NOT IN (?)", db.busyCollyIDs).Where(&Companies{IsCollyCrawled: false}).Find(&company)
@@ -60,13 +64,45 @@ func (db *Database) GetCollyURL() (string, error) {
 	fmt.Println("busy colly: ", db.busyCollyIDs)
 	return company.URL, nil
 }
+*/
 
-func (db *Database) FinishedCollyURL() {
-
+func (db *Database) GetCommon() []Companies {
+	companies := []Companies{}
+	db.Where("is_common_crawled != 1").Find(&companies)
+	return companies
 }
 
-func (db *Database) GetGoogleURL() {
+func (db *Database) CommonFinished(url string) {
+	company := Companies{URL: url}
+	db.Model(&company).Where("url = ?", url).Update("is_common_crawled", true)
+	company.IsCommonCrawled = true
+	db.Save(&company)
+}
 
+func (db *Database) GetGoogle() []Companies {
+	companies := []Companies{}
+	db.Where("is_google_crawled != 1").Find(&companies)
+	return companies
+}
+
+func (db *Database) GoogleFinished(url string) {
+	company := Companies{URL: url}
+	db.Model(&company).Where("url = ?", url).Update("is_google_crawled", true)
+	company.IsGoogleCrawled = true
+	db.Save(&company)
+}
+
+func (db *Database) GetColly() []Companies {
+	companies := []Companies{}
+	db.Where("is_colly_crawled != 1").Find(&companies)
+	return companies
+}
+
+func (db *Database) CollyFinished(url string) {
+	company := Companies{URL: url}
+	db.Model(&company).Where("url = ?", url).Update("is_colly_crawled", true)
+	company.IsCollyCrawled = true
+	db.Save(&company)
 }
 
 func (db *Database) fillToDebug() {
@@ -107,17 +143,5 @@ func main() {
 	db.fillToDebug()
 
 	db.PrintInfo()
-	collyURL, err := db.GetCollyURL()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println("CollyURL: ", collyURL)
-
-	collyURL, err = db.GetCollyURL()
-	fmt.Println("CollyURL: ", collyURL)
-
-	collyURL, err = db.GetCollyURL()
-	fmt.Println("CollyURL: ", collyURL)
-
 	db.Close()
 }
