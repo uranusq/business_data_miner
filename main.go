@@ -155,7 +155,7 @@ func (m Miner) CollyCrawl(saveTo string, wg *sync.WaitGroup) {
 }
 
 func main() {
-	saveTo, dbFile := "./data", "test.db"
+	saveTo, dbFile := "./data", "prod.db"
 	// commonProcs, googleProcs, collyProcs := 20, 2, 20
 	var wg sync.WaitGroup
 	wg.Add(3) // 3 When all miners used

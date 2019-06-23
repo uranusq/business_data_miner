@@ -24,7 +24,7 @@ func (db *Database) OpenInitialize(path string) {
 	}
 	//defer gdb.Close()
 
-	gdb.AutoMigrate(&Industries{}, &Companies{})
+	gdb.AutoMigrate(&Economics{}, &Business{}, &IndustryGroups{}, &Industries{}, &Companies{})
 	db.DB = gdb
 	db.Exec("PRAGMA foreign_keys = ON;")
 	db.LogMode(false)
