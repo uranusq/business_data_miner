@@ -7,6 +7,7 @@ import (
 	cc "mygo/gocommoncrawl"
 
 	d "./db"
+	"github.com/BurntSushi/toml"
 )
 
 // Miner ...
@@ -159,24 +160,27 @@ func (m Miner) CollyCrawl(saveTo string, wg *sync.WaitGroup) {
 }
 
 func main() {
-	saveTo, dbFile := "./data", "./prod.db"
-	// commonProcs, googleProcs, collyProcs := 20, 2, 20
+	var config Config
+	if _, err := toml.DecodeFile("config.toml", &config); err != nil {
+		panic(err)
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(3) // 3 When all miners used
 	miner := Miner{}
 	miner.db = d.Database{}
 
-	miner.db.OpenInitialize(dbFile)
+	miner.db.OpenInitialize(config.Paths.DB)
 	miner.db.PrintInfo()
 	defer miner.db.Close()
 
 	// 1. Use CommonCrawl to retrive indexed HTML pages of given site
-	go miner.CommonCrawl(saveTo+"/common/", &wg)
+	go miner.CommonCrawl(config.Paths.Data+"/common/", &wg)
 
 	// 2. Use Google search with to find cached files
-	go miner.GoogleCrawl(saveTo+"/google/", &wg)
+	go miner.GoogleCrawl(config.Paths.Data+"/google/", &wg)
 
 	// 3. Crawl site with gocolly to find unindexed documents
-	go miner.CollyCrawl(saveTo+"/colly/", &wg)
+	go miner.CollyCrawl(config.Paths.Data+"/colly/", &wg)
 	wg.Wait()
 }
