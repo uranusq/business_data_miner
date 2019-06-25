@@ -20,14 +20,14 @@ type IndustryGroups struct {
 	NumDocs        *uint  `gorm:"default:0"`
 }
 
-//Industries ... Industried by `Thomson Reuters Business Classification` and number of files belonging to them
-type Business struct {
+//Industries ... Industried by `Thomson Reuters Businesses Classification` and number of files belonging to them
+type Businesses struct {
 	//gorm.Model
-	ID       int    `gorm:"primary_key;AUTO_INCREMENT"`
-	Business string `gorm:"unique;not null"`
-	NumURL   *uint  `gorm:"default:0"`
-	NumHTML  *uint  `gorm:"default:0"`
-	NumDocs  *uint  `gorm:"default:0"`
+	ID         int    `gorm:"primary_key;AUTO_INCREMENT"`
+	Businesses string `gorm:"unique;not null"`
+	NumURL     *uint  `gorm:"default:0"`
+	NumHTML    *uint  `gorm:"default:0"`
+	NumDocs    *uint  `gorm:"default:0"`
 }
 
 //Industries ... Industried by `Thomson Reuters Business Classification` and number of files belonging to them
@@ -53,6 +53,6 @@ type Companies struct {
 	NumHTML         *uint  `gorm:"default:0"`
 	Industry        string `sql:"type:integer REFERENCES Industries(industry)"`
 	IndustryGroup   string `sql:"type:integer REFERENCES IndustryGroups(industry_group)"`
-	Business        string `sql:"type:integer REFERENCES Business(business)"`
+	Businesses      string `sql:"type:integer REFERENCES Businesses(businesses)"`
 	Economics       string `sql:"type:integer REFERENCES Economics(economics)"`
 }

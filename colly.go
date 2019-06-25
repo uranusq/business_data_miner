@@ -1,7 +1,9 @@
 package main
 
 import (
-	"fmt"
+	"crypto/tls"
+	"net"
+	"net/http"
 	"time"
 
 	"github.com/gocolly/colly"
@@ -9,9 +11,10 @@ import (
 
 // CollyResultChan ... result of work of `CrawlSite` function
 type CollyResultChan struct {
-	URL   string
-	Error error
-	Done  bool
+	URL    string
+	Error  error
+	Loaded uint
+	Done   bool
 }
 
 // CrawlSite ... Crawl choosen URL and saves found files
@@ -23,7 +26,17 @@ func CrawlSite(urlSite string, saveto string, maxMB float32, maxLoad uint, workM
 	waitTime := time.Minute * workMinutes
 	exit := false
 	c := colly.NewCollector()
-	c.AllowedDomains = []string{"*." + urlSite, urlSite}
+	c.AllowedDomains = []string{"www." + urlSite, "sso." + urlSite, urlSite}
+	c.WithTransport(&http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		Dial: (&net.Dialer{
+			Timeout:   60 * time.Second,
+			KeepAlive: 60 * time.Second,
+		}).Dial,
+		TLSHandshakeTimeout:   30 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second,
+		ExpectContinueTimeout: 10 * time.Second,
+	})
 	// Reduce maximum response body size to 1M
 	size := int(1024 * 1024 * maxMB)
 	c.MaxBodySize = size
@@ -45,8 +58,8 @@ func CrawlSite(urlSite string, saveto string, maxMB float32, maxLoad uint, workM
 		elapsed := time.Since(start)
 		ext := ExtensionByContent(r.Body)
 		if elapsed > waitTime && !exit {
-			fmt.Println(url, " time end")
-			resultChan <- CollyResultChan{URL: urlSite, Done: true}
+			//fmt.Println(url, " time end")
+			resultChan <- CollyResultChan{URL: urlSite, Done: true, Loaded: loadedSize}
 			exit = true
 			return
 		} else if ext == ".none" {
@@ -60,5 +73,10 @@ func CrawlSite(urlSite string, saveto string, maxMB float32, maxLoad uint, workM
 	})
 
 	c.Visit(url)
-	resultChan <- CollyResultChan{URL: urlSite, Done: true}
+	// If it crawled less than 25 Kb - try again, but with `www.` domain
+	if loadedSize < 1024*25 {
+		url = "https://www." + urlSite
+		c.Visit(url)
+	}
+	resultChan <- CollyResultChan{URL: urlSite, Done: true, Loaded: loadedSize}
 }

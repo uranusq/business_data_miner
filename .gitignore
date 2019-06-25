@@ -6,3 +6,6 @@ aux.go
 *.txt
 *.pdf
 *.xml
+*.exe
+builds/*
+database_saves/*

@@ -23,11 +23,12 @@ func (db *Database) OpenInitialize(path string) {
 		panic("failed to connect database")
 	}
 	//defer gdb.Close()
-
-	gdb.AutoMigrate(&Economics{}, &Business{}, &IndustryGroups{}, &Industries{}, &Companies{})
+	gdb.Exec("PRAGMA foreign_keys = ON;")
+	gdb.SingularTable(true)
+	gdb.LogMode(false)
+	gdb.AutoMigrate(&Economics{}, &Businesses{}, &IndustryGroups{}, &Industries{}, &Companies{})
 	db.DB = gdb
-	db.Exec("PRAGMA foreign_keys = ON;")
-	db.LogMode(false)
+
 	// Exclude 0 indexes, since they always have empty values in SQLite
 	//db.busyCollyIDs = []int{0}
 	//db.busyCrawlIDs = []int{0}

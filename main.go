@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -35,7 +34,7 @@ func (m Miner) CommonCrawl(saveTo string, wg *sync.WaitGroup) {
 			} else if r.Done {
 				m.db.CommonFinished(r.URL)
 				logger.Printf("Common done: %v\n", r.URL)
-				fmt.Printf("Commo done: %v\n", r.URL)
+				//fmt.Printf("Commo done: %v\n", r.URL)
 				done++
 				innerWg.Done()
 			}
@@ -81,7 +80,7 @@ func (m Miner) GoogleCrawl(saveTo string, wg *sync.WaitGroup) {
 			} else if r.Done {
 				m.db.GoogleFinished(r.URL)
 				logger.Printf("Google done: %v\n", r.URL)
-				fmt.Printf("Google done: %v\n", r.URL)
+				//fmt.Printf("Google done: %v\n", r.URL)
 				done++
 				innerWg.Done()
 			}
@@ -96,13 +95,13 @@ func (m Miner) GoogleCrawl(saveTo string, wg *sync.WaitGroup) {
 		saveFolder := saveTo + cc.EscapeURL(c.URL)
 		err := createDir(saveFolder)
 		if err != nil {
-			fmt.Println("[GoogleCrawl] error: ", err)
+			//fmt.Println("[GoogleCrawl] error: ", err)
 		}
 
 		waitTime := time.Second * 30
 		start := time.Now()
 
-		go FetchURLFiles(c.URL, "pdf", saveFolder, 20, resChan)
+		go FetchURLFiles(c.URL, "pdf", saveFolder, 35, resChan)
 
 		elapsed := time.Since(start)
 		if elapsed < waitTime {
@@ -127,10 +126,15 @@ func (m Miner) CollyCrawl(saveTo string, wg *sync.WaitGroup) {
 			if r.Error != nil {
 				logger.Printf("[CollyCrawl] Error occured: %v\n", r.Error)
 				//fmt.Printf("[CollyCrawl] Error occured: %v\n", r.Error)
-			} else if r.Done {
+			} else if r.Done && r.Loaded > 0 {
 				m.db.CollyFinished(r.URL)
 				logger.Printf("Colly done: %v\n", r.URL)
-				fmt.Printf("Colly done: %v\n", r.URL)
+				//fmt.Printf("Colly done: %v\n", r.URL)
+				done++
+				innerWg.Done()
+			} else if r.Done && r.Loaded == 0 {
+				logger.Printf("Colly failed: %v\n", r.URL)
+				//fmt.Printf("Colly failed: %v\n", r.URL)
 				done++
 				innerWg.Done()
 			}
@@ -148,14 +152,14 @@ func (m Miner) CollyCrawl(saveTo string, wg *sync.WaitGroup) {
 		if err != nil {
 			panic(err)
 		}
-		go CrawlSite(c.URL, saveFolder, 20, 50, 30, resChan)
+		go CrawlSite(c.URL, saveFolder, 35, 50, 30, resChan)
 	}
 
 	innerWg.Wait()
 }
 
 func main() {
-	saveTo, dbFile := "./data", "prod.db"
+	saveTo, dbFile := "./data", "./prod.db"
 	// commonProcs, googleProcs, collyProcs := 20, 2, 20
 	var wg sync.WaitGroup
 	wg.Add(3) // 3 When all miners used
