@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gocolly/colly"
+	cly "github.com/gocolly/colly"
 )
 
 // CollyResultChan ... result of work of `CrawlSite` function
@@ -25,7 +25,7 @@ func CrawlSite(urlSite string, saveto string, maxMB float32, maxLoad uint, workM
 	maxLoadSize := maxLoad * 1024
 	waitTime := time.Minute * workMinutes
 	exit := false
-	c := colly.NewCollector()
+	c := cly.NewCollector()
 	c.AllowedDomains = []string{"www." + urlSite, "sso." + urlSite, urlSite}
 	c.WithTransport(&http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -41,20 +41,20 @@ func CrawlSite(urlSite string, saveto string, maxMB float32, maxLoad uint, workM
 	size := int(1024 * 1024 * maxMB)
 	c.MaxBodySize = size
 
-	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+	c.OnHTML("a[href]", func(e *cly.HTMLElement) {
 		link := e.Attr("href")
 		c.Visit(e.Request.AbsoluteURL(link))
 	})
 
-	c.OnRequest(func(r *colly.Request) {
+	c.OnRequest(func(r *cly.Request) {
 		//fmt.Println("[Visiting]", r.URL.String())
 	})
-	c.OnError(func(_ *colly.Response, err error) {
+	c.OnError(func(_ *cly.Response, err error) {
 		resultChan <- CollyResultChan{URL: url, Error: err}
 	})
 
 	start := time.Now()
-	c.OnResponse(func(r *colly.Response) {
+	c.OnResponse(func(r *cly.Response) {
 		elapsed := time.Since(start)
 		ext := ExtensionByContent(r.Body)
 		if elapsed > waitTime && !exit {

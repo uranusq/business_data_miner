@@ -9,3 +9,5 @@ aux.go
 *.exe
 builds/*
 database_saves/*
+crawls/*
+data*

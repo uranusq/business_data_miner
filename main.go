@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -10,15 +11,15 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// Miner ...
+// Miner ... Holds reference of database and do grouping of methods
 type Miner struct {
 	db d.Database
 }
 
 // CommonCrawl ...
-func (m Miner) CommonCrawl(saveTo string, wg *sync.WaitGroup) {
+func (m Miner) CommonCrawl(config commonConfig, wg *sync.WaitGroup) {
 	defer wg.Done()
-	logger := logToFile(saveTo + "/log.txt")
+	logger := logToFile(config.Path + "/log.txt")
 	resChan := make(chan cc.Result)
 	companies := m.db.GetCommon()
 	var innerWg sync.WaitGroup
@@ -29,13 +30,17 @@ func (m Miner) CommonCrawl(saveTo string, wg *sync.WaitGroup) {
 		for r := range resChan {
 			if r.Error != nil {
 				logger.Printf("[CommonCrawl] Error occured: %v\n", r.Error)
-				//fmt.Printf("Error occured: %v\n", r.Error)
-			} else if r.Progress > 0 {
-				//fmt.Printf("Progress %v: %v/%v\n", r.URL, r.Progress, r.Total)
+				if config.Debug {
+					fmt.Printf("Error occured: %v\n", r.Error)
+				}
+			} else if r.Progress > 0 && config.Debug {
+				fmt.Printf("Progress %v: %v/%v\n", r.URL, r.Progress, r.Total)
 			} else if r.Done {
 				m.db.CommonFinished(r.URL)
 				logger.Printf("Common done: %v\n", r.URL)
-				//fmt.Printf("Commo done: %v\n", r.URL)
+				if config.Debug {
+					fmt.Printf("Commo done: %v\n", r.URL)
+				}
 				done++
 				innerWg.Done()
 			}
@@ -47,7 +52,7 @@ func (m Miner) CommonCrawl(saveTo string, wg *sync.WaitGroup) {
 	}()
 
 	for _, c := range companies {
-		saveFolder := saveTo + cc.EscapeURL(c.URL)
+		saveFolder := config.Path + "/" + cc.EscapeURL(c.URL)
 
 		waitTime := time.Second * 1
 		start := time.Now()
@@ -63,9 +68,9 @@ func (m Miner) CommonCrawl(saveTo string, wg *sync.WaitGroup) {
 }
 
 // GoogleCrawl ...
-func (m Miner) GoogleCrawl(saveTo string, wg *sync.WaitGroup) {
+func (m Miner) GoogleCrawl(config googleConfig, wg *sync.WaitGroup) {
 	defer wg.Done()
-	logger := logToFile(saveTo + "/log.txt")
+	logger := logToFile(config.Path + "/log.txt")
 	resChan := make(chan GoogleResultChan)
 	companies := m.db.GetGoogle()
 	var innerWg sync.WaitGroup
@@ -76,12 +81,17 @@ func (m Miner) GoogleCrawl(saveTo string, wg *sync.WaitGroup) {
 		for r := range resChan {
 			if r.Error != nil {
 				logger.Printf("[GoogleCrawl] Error occured: %v\n", r.Error)
-			} else if r.Progress > 0 {
-				//fmt.Printf("Progress %v: %v/%v\n", r.URL, r.Progress, r.Total)
+				if config.Debug {
+					fmt.Printf("[GoogleCrawl] Error occured: %v\n", r.Error)
+				}
+			} else if r.Progress > 0 && config.Debug {
+				fmt.Printf("Progress %v: %v/%v\n", r.URL, r.Progress, r.Total)
 			} else if r.Done {
 				m.db.GoogleFinished(r.URL)
 				logger.Printf("Google done: %v\n", r.URL)
-				//fmt.Printf("Google done: %v\n", r.URL)
+				if config.Debug {
+					fmt.Printf("Google done: %v\n", r.URL)
+				}
 				done++
 				innerWg.Done()
 			}
@@ -93,10 +103,10 @@ func (m Miner) GoogleCrawl(saveTo string, wg *sync.WaitGroup) {
 	}()
 
 	for _, c := range companies {
-		saveFolder := saveTo + cc.EscapeURL(c.URL)
+		saveFolder := config.Path + "/" + cc.EscapeURL(c.URL)
 		err := createDir(saveFolder)
-		if err != nil {
-			//fmt.Println("[GoogleCrawl] error: ", err)
+		if err != nil && config.Debug {
+			fmt.Println("[GoogleCrawl] error: ", err)
 		}
 
 		waitTime := time.Second * 30
@@ -113,9 +123,9 @@ func (m Miner) GoogleCrawl(saveTo string, wg *sync.WaitGroup) {
 }
 
 // CollyCrawl ...
-func (m Miner) CollyCrawl(saveTo string, wg *sync.WaitGroup) {
+func (m Miner) CollyCrawl(config collyConfig, wg *sync.WaitGroup) {
 	defer wg.Done()
-	logger := logToFile(saveTo + "/log.txt")
+	logger := logToFile(config.Path + "/log.txt")
 	resChan := make(chan CollyResultChan)
 	companies := m.db.GetColly()
 	var innerWg sync.WaitGroup
@@ -126,16 +136,22 @@ func (m Miner) CollyCrawl(saveTo string, wg *sync.WaitGroup) {
 		for r := range resChan {
 			if r.Error != nil {
 				logger.Printf("[CollyCrawl] Error occured: %v\n", r.Error)
-				//fmt.Printf("[CollyCrawl] Error occured: %v\n", r.Error)
+				if config.Debug {
+					fmt.Printf("[CollyCrawl] Error occured: %v\n", r.Error)
+				}
 			} else if r.Done && r.Loaded > 0 {
 				m.db.CollyFinished(r.URL)
 				logger.Printf("Colly done: %v\n", r.URL)
-				//fmt.Printf("Colly done: %v\n", r.URL)
+				if config.Debug {
+					fmt.Printf("Colly done: %v\n", r.URL)
+				}
 				done++
 				innerWg.Done()
 			} else if r.Done && r.Loaded == 0 {
 				logger.Printf("Colly failed: %v\n", r.URL)
-				//fmt.Printf("Colly failed: %v\n", r.URL)
+				if config.Debug {
+					fmt.Printf("Colly failed: %v\n", r.URL)
+				}
 				done++
 				innerWg.Done()
 			}
@@ -147,8 +163,7 @@ func (m Miner) CollyCrawl(saveTo string, wg *sync.WaitGroup) {
 	}()
 
 	for _, c := range companies {
-
-		saveFolder := saveTo + cc.EscapeURL(c.URL)
+		saveFolder := config.Path + "/" + cc.EscapeURL(c.URL)
 		err := createDir(saveFolder)
 		if err != nil {
 			panic(err)
@@ -160,27 +175,37 @@ func (m Miner) CollyCrawl(saveTo string, wg *sync.WaitGroup) {
 }
 
 func main() {
+	// Try to load config file, if error -> meaningless to proceed
 	var config Config
 	if _, err := toml.DecodeFile("config.toml", &config); err != nil {
+		fmt.Println("Config load error:")
 		panic(err)
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(3) // 3 When all miners used
+	// Initialize miner and database
 	miner := Miner{}
 	miner.db = d.Database{}
-
-	miner.db.OpenInitialize(config.Paths.DB)
+	miner.db.OpenInitialize(config.General.Database)
 	miner.db.PrintInfo()
 	defer miner.db.Close()
 
+	var wg sync.WaitGroup
 	// 1. Use CommonCrawl to retrive indexed HTML pages of given site
-	go miner.CommonCrawl(config.Paths.Data+"/common/", &wg)
+	if config.Common.Use {
+		wg.Add(1)
+		go miner.CommonCrawl(config.Common, &wg)
+	}
 
 	// 2. Use Google search with to find cached files
-	go miner.GoogleCrawl(config.Paths.Data+"/google/", &wg)
+	if config.Google.Use {
+		wg.Add(1)
+		go miner.GoogleCrawl(config.Google, &wg)
+	}
 
 	// 3. Crawl site with gocolly to find unindexed documents
-	go miner.CollyCrawl(config.Paths.Data+"/colly/", &wg)
+	if config.Colly.Use {
+		wg.Add(1)
+		go miner.CollyCrawl(config.Colly, &wg)
+	}
 	wg.Wait()
 }

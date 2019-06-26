@@ -1,11 +1,31 @@
 package main
 
-// Config ...
+// Config ... Holds structure of TOML configuration file
 type Config struct {
-	Paths paths
+	General generalConfig
+	Common  commonConfig
+	Google  googleConfig
+	Colly   collyConfig
 }
 
-type paths struct {
-	Data string
-	DB   string
+type generalConfig struct {
+	Database string
+}
+
+type commonConfig struct {
+	Use   bool
+	Path  string
+	Debug bool
+}
+
+type googleConfig struct {
+	Use   bool
+	Path  string
+	Debug bool
+}
+
+type collyConfig struct {
+	Use   bool
+	Path  string
+	Debug bool
 }

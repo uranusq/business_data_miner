@@ -1,3 +1,17 @@
-[paths]
-data = "data"
-db = "prod.db"
+[general]
+database = "prod.db"
+
+[common]
+use = true
+path = "data/common"
+debug = true
+
+[google]
+use = false
+path = "data/google"
+debug = false
+
+[colly]
+use = false
+path = "data/colly"
+debug = false

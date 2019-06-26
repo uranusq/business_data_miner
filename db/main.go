@@ -20,7 +20,7 @@ type Database struct {
 func (db *Database) OpenInitialize(path string) {
 	gdb, err := gorm.Open("sqlite3", path)
 	if err != nil {
-		panic("failed to connect database")
+		log.Fatalln("failed to connect database: ", err)
 	}
 	//defer gdb.Close()
 	gdb.Exec("PRAGMA foreign_keys = ON;")
