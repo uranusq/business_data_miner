@@ -18,24 +18,24 @@ type CollyResultChan struct {
 }
 
 // CrawlSite ... Crawl choosen URL and saves found files
-func CrawlSite(urlSite string, saveto string, maxMB float32, maxLoad uint, workMinutes time.Duration, resultChan chan CollyResultChan) {
+func CrawlSite(urlSite string, saveto string, maxMB int, maxLoad uint, workMinutes int, resultChan chan CollyResultChan) {
 	url := "https://" + urlSite
 
 	var loadedSize uint
 	maxLoadSize := maxLoad * 1024
-	waitTime := time.Minute * workMinutes
+	waitTime := time.Minute * time.Duration(workMinutes)
 	exit := false
 	c := cly.NewCollector()
-	c.AllowedDomains = []string{"www." + urlSite, "sso." + urlSite, urlSite}
+	c.AllowedDomains = []string{"www." + urlSite, "sso." + urlSite, urlSite, "s3.amazonaws.com"}
 	c.WithTransport(&http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		Dial: (&net.Dialer{
-			Timeout:   60 * time.Second,
-			KeepAlive: 60 * time.Second,
+			Timeout:   180 * time.Second,
+			KeepAlive: 0,
 		}).Dial,
-		TLSHandshakeTimeout:   30 * time.Second,
-		ResponseHeaderTimeout: 30 * time.Second,
-		ExpectContinueTimeout: 10 * time.Second,
+		TLSHandshakeTimeout:   60 * time.Second,
+		ResponseHeaderTimeout: 60 * time.Second,
+		ExpectContinueTimeout: 60 * time.Second,
 	})
 	// Reduce maximum response body size to 1M
 	size := int(1024 * 1024 * maxMB)
@@ -47,6 +47,7 @@ func CrawlSite(urlSite string, saveto string, maxMB float32, maxLoad uint, workM
 	})
 
 	c.OnRequest(func(r *cly.Request) {
+		r.Headers.Set("User-Agent", randomOption(userAgents))
 		//fmt.Println("[Visiting]", r.URL.String())
 	})
 	c.OnError(func(_ *cly.Response, err error) {

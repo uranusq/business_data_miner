@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	d "./db"
 )
 
 // ExtensionByContent ... Returns extension of file by detecting its MIME type, `.none` returned if no MIME found
@@ -62,8 +64,8 @@ func randomOption(options []string) string {
 	return options[randNum]
 }
 
-// Create directory if not exists
-func createDir(path string) error {
+// CreateDir ... Create directory if not exists
+func CreateDir(path string) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		err := os.Mkdir(path, os.ModeDir)
 		if err != nil {
@@ -72,6 +74,23 @@ func createDir(path string) error {
 	}
 	return nil
 }
+
+// CreateDirs ... Creates directories in chosen directory from array of strings
+func CreateDirs(path string, dirs []string) error {
+	var err error
+	for _, dir := range dirs {
+		err = CreateDir(path + "/" + dir)
+	}
+	return err
+}
+
+func getCompanyIndustry(c d.Companies) string {
+	if c.IndustryGroups != "" {
+		return c.IndustryGroups
+	}
+	return c.Industry
+}
+
 func logToFile(location string) *log.Logger {
 	f, err := os.Create(location)
 	if err != nil {

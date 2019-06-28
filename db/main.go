@@ -137,6 +137,35 @@ func (db *Database) fillToDebug() {
 	}
 }
 
+// GetIndustriesFolders ... Returns folders of industry categories, folders of which should be created
+func (db *Database) GetIndustriesFolders() []string {
+	folders := []string{}
+	companies := []Companies{}
+
+	// Get all companies that have Industry Group and make a set of these group names
+	db.Where("industry_groups != 0").Find(&companies)
+	industryGroupSet := map[string]struct{}{}
+	for _, c := range companies {
+		industryGroupSet[c.IndustryGroups] = struct{}{}
+	}
+
+	// Get all companies that have Industry and do not have Industry group, then make a set of these industry names
+	db.Where("industry != 0 and industry_groups is NULL").Find(&companies)
+	industrySet := map[string]struct{}{}
+	for _, c := range companies {
+		industrySet[c.Industry] = struct{}{}
+	}
+
+	// Join the 2 sets
+	for ig := range industryGroupSet {
+		folders = append(folders, ig)
+	}
+	for i := range industrySet {
+		folders = append(folders, i)
+	}
+	return folders
+}
+
 func main() {
 	//os.Remove("test.db")
 	db := Database{}

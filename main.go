@@ -2,48 +2,66 @@ package main
 
 import (
 	"fmt"
+	"net/url"
+	"path"
 	"sync"
 	"time"
 
-	cc "mygo/gocommoncrawl"
+	cc "github.com/karust/gocommoncrawl"
 
 	d "./db"
 	"github.com/BurntSushi/toml"
 )
 
-// Miner ... Holds reference of database and do grouping of methods
+// Miner ... Holds reference of database and does grouping of methods
 type Miner struct {
-	db d.Database
+	db              d.Database
+	industryFolders []string
 }
 
-// CommonCrawl ...
+// CommonCrawl ... Crawler which uses Common Crawl web archive to get HTML pages and other data
 func (m Miner) CommonCrawl(config commonConfig, wg *sync.WaitGroup) {
 	defer wg.Done()
+
+	// Create directories in which data from sites will be saved
+	err := CreateDirs(config.Path, m.industryFolders)
+	if err != nil {
+		fmt.Printf("[CollyCrawl] Fatal error occured: %v\n", err)
+		return
+	}
+
+	// Initialize variables
 	logger := logToFile(config.Path + "/log.txt")
 	resChan := make(chan cc.Result)
 	companies := m.db.GetCommon()
+	workers := 0
 	var innerWg sync.WaitGroup
 	innerWg.Add(len(companies) + 1)
 
+	// Track progress from goroutines via channel
 	go func() {
 		done := 0
 		for r := range resChan {
 			if r.Error != nil {
 				logger.Printf("[CommonCrawl] Error occured: %v\n", r.Error)
-				if config.Debug {
-					fmt.Printf("Error occured: %v\n", r.Error)
-				}
-			} else if r.Progress > 0 && config.Debug {
-				fmt.Printf("Progress %v: %v/%v\n", r.URL, r.Progress, r.Total)
 			} else if r.Done {
 				m.db.CommonFinished(r.URL)
 				logger.Printf("Common done: %v\n", r.URL)
-				if config.Debug {
-					fmt.Printf("Commo done: %v\n", r.URL)
-				}
 				done++
+				workers--
 				innerWg.Done()
 			}
+
+			// Debug output
+			if config.Debug && r.Error != nil {
+				fmt.Printf("Error occured: %v\n", r.Error)
+			} else if config.Debug && r.Progress > 0 {
+				fmt.Printf("Progress %v: %v/%v\n", r.URL, r.Progress, r.Total)
+			} else if config.Debug && r.Done {
+				fmt.Printf("Commo done: %v\n", r.URL)
+			}
+
+			// If amount of `Dones` equal to amount of companies, then exit loop
 			if done == len(companies) {
 				break
 			}
@@ -52,13 +70,20 @@ func (m Miner) CommonCrawl(config commonConfig, wg *sync.WaitGroup) {
 	}()
 
 	for _, c := range companies {
-		saveFolder := config.Path + "/" + cc.EscapeURL(c.URL)
+		for workers >= config.Workers {
+			time.Sleep(time.Second * 1)
+		}
 
-		waitTime := time.Second * 1
+		saveFolder := path.Join(config.Path, getCompanyIndustry(c), url.PathEscape(c.URL))
+
+		// Do not overload Index API server
+		waitTime := time.Second * time.Duration(config.SearchInterval)
 		start := time.Now()
 
-		go cc.FetchURLData(c.URL, saveFolder, resChan, 30, "", 53)
+		go cc.FetchURLData(c.URL, saveFolder, resChan, config.Timeout, config.CrawlDB, config.WaitTime)
+		workers++
 
+		// Wait time before proceed cycle
 		elapsed := time.Since(start)
 		if elapsed < waitTime {
 			time.Sleep(waitTime - elapsed)
@@ -67,34 +92,49 @@ func (m Miner) CommonCrawl(config commonConfig, wg *sync.WaitGroup) {
 	innerWg.Wait()
 }
 
-// GoogleCrawl ...
+// GoogleCrawl ... Uses google search filters to find documents
 func (m Miner) GoogleCrawl(config googleConfig, wg *sync.WaitGroup) {
 	defer wg.Done()
+
+	// Create directories in which data from sites will be saved
+	err := CreateDirs(config.Path, m.industryFolders)
+	if err != nil {
+		fmt.Printf("[CollyCrawl] Fatal error occured: %v\n", err)
+		return
+	}
+
+	// Initialize variables
 	logger := logToFile(config.Path + "/log.txt")
 	resChan := make(chan GoogleResultChan)
 	companies := m.db.GetGoogle()
+	workers := 0
 	var innerWg sync.WaitGroup
 	innerWg.Add(len(companies) + 1)
 
+	// Track progress from goroutines via channel
 	go func() {
 		done := 0
 		for r := range resChan {
 			if r.Error != nil {
 				logger.Printf("[GoogleCrawl] Error occured: %v\n", r.Error)
-				if config.Debug {
-					fmt.Printf("[GoogleCrawl] Error occured: %v\n", r.Error)
-				}
-			} else if r.Progress > 0 && config.Debug {
-				fmt.Printf("Progress %v: %v/%v\n", r.URL, r.Progress, r.Total)
 			} else if r.Done {
 				m.db.GoogleFinished(r.URL)
 				logger.Printf("Google done: %v\n", r.URL)
-				if config.Debug {
-					fmt.Printf("Google done: %v\n", r.URL)
-				}
 				done++
+				workers--
 				innerWg.Done()
 			}
+
+			// Debug output
+			if config.Debug && r.Error != nil {
+				fmt.Printf("[GoogleCrawl] Error occured: %v\n", r.Error)
+			} else if config.Debug && r.Progress > 0 {
+				fmt.Printf("Progress %v: %v/%v\n", r.URL, r.Progress, r.Total)
+			} else if config.Debug && r.Done {
+				fmt.Printf("Google done: %v\n", r.URL)
+			}
+
+			// If amount of `Dones` equal to amount of companies, then exit loop
 			if done == len(companies) {
 				break
 			}
@@ -103,17 +143,24 @@ func (m Miner) GoogleCrawl(config googleConfig, wg *sync.WaitGroup) {
 	}()
 
 	for _, c := range companies {
-		saveFolder := config.Path + "/" + cc.EscapeURL(c.URL)
-		err := createDir(saveFolder)
+		for workers >= config.Workers {
+			time.Sleep(time.Second * 1)
+		}
+
+		saveFolder := path.Join(config.Path, getCompanyIndustry(c), url.PathEscape(c.URL))
+		err := CreateDir(saveFolder)
 		if err != nil && config.Debug {
 			fmt.Println("[GoogleCrawl] error: ", err)
 		}
 
-		waitTime := time.Second * 30
+		// Google search queries should not be too ofter, therefore launch goroutine with intervals
+		waitTime := time.Second * time.Duration(config.SearchInterval)
 		start := time.Now()
 
-		go FetchURLFiles(c.URL, "pdf", saveFolder, 35, resChan)
+		go FetchURLFiles(c.URL, config.Extension, saveFolder, config.MaxFileSize, resChan)
+		workers++
 
+		// Wait time before next cycle
 		elapsed := time.Since(start)
 		if elapsed < waitTime {
 			time.Sleep(waitTime - elapsed)
@@ -122,39 +169,55 @@ func (m Miner) GoogleCrawl(config googleConfig, wg *sync.WaitGroup) {
 	innerWg.Wait()
 }
 
-// CollyCrawl ...
+// CollyCrawl ... Crawls each website by visiting links on them. Saves found PDF and HTML documents
 func (m Miner) CollyCrawl(config collyConfig, wg *sync.WaitGroup) {
 	defer wg.Done()
+
+	// Create directories in which data from sites will be saved
+	err := CreateDirs(config.Path, m.industryFolders)
+	if err != nil {
+		fmt.Printf("[CollyCrawl] Fatal error occured: %v\n", err)
+		return
+	}
+
+	// Initialize variables
 	logger := logToFile(config.Path + "/log.txt")
 	resChan := make(chan CollyResultChan)
 	companies := m.db.GetColly()
+	workers := 0
 	var innerWg sync.WaitGroup
 	innerWg.Add(len(companies) + 1)
 
+	// Track progress from goroutines via channel
 	go func() {
 		done := 0
 		for r := range resChan {
 			if r.Error != nil {
 				logger.Printf("[CollyCrawl] Error occured: %v\n", r.Error)
-				if config.Debug {
-					fmt.Printf("[CollyCrawl] Error occured: %v\n", r.Error)
-				}
 			} else if r.Done && r.Loaded > 0 {
+				// Save state in database
 				m.db.CollyFinished(r.URL)
 				logger.Printf("Colly done: %v\n", r.URL)
-				if config.Debug {
-					fmt.Printf("Colly done: %v\n", r.URL)
-				}
 				done++
+				workers--
 				innerWg.Done()
 			} else if r.Done && r.Loaded == 0 {
 				logger.Printf("Colly failed: %v\n", r.URL)
-				if config.Debug {
-					fmt.Printf("Colly failed: %v\n", r.URL)
-				}
 				done++
+				workers--
 				innerWg.Done()
 			}
+
+			// Debug output
+			if config.Debug && r.Error != nil {
+				fmt.Printf("[CollyCrawl] Error occured: %v\n", r.Error)
+			} else if config.Debug && r.Done && r.Loaded > 0 {
+				fmt.Printf("Colly done: %v\n", r.URL)
+			} else if config.Debug && r.Done && r.Loaded == 0 {
+				fmt.Printf("Colly failed: %v\n", r.URL)
+			}
+
+			// If amount of `Dones` equal to amount of companies, then exit loop
 			if done == len(companies) {
 				break
 			}
@@ -162,20 +225,25 @@ func (m Miner) CollyCrawl(config collyConfig, wg *sync.WaitGroup) {
 		innerWg.Done()
 	}()
 
+	// Launch goroutine with crawler for each site
 	for _, c := range companies {
-		saveFolder := config.Path + "/" + cc.EscapeURL(c.URL)
-		err := createDir(saveFolder)
+		for workers >= config.Workers {
+			time.Sleep(time.Second * 1)
+		}
+		saveFolder := path.Join(config.Path, getCompanyIndustry(c), url.PathEscape(c.URL))
+		err := CreateDir(saveFolder)
 		if err != nil {
 			panic(err)
 		}
-		go CrawlSite(c.URL, saveFolder, 35, 50, 30, resChan)
+		go CrawlSite(c.URL, saveFolder, config.MaxFileSize, config.MaxHTMLLoad, config.WorkMinutes, resChan)
+		workers++
 	}
 
 	innerWg.Wait()
 }
 
 func main() {
-	// Try to load config file, if error -> meaningless to proceed
+	// Try to load configuration file, if error then meaningless to proceed
 	var config Config
 	if _, err := toml.DecodeFile("config.toml", &config); err != nil {
 		fmt.Println("Config load error:")
@@ -188,6 +256,9 @@ func main() {
 	miner.db.OpenInitialize(config.General.Database)
 	miner.db.PrintInfo()
 	defer miner.db.Close()
+
+	// Get insustry folders in which data will be saved in categorized way
+	miner.industryFolders = miner.db.GetIndustriesFolders()
 
 	var wg sync.WaitGroup
 	// 1. Use CommonCrawl to retrive indexed HTML pages of given site
@@ -202,7 +273,7 @@ func main() {
 		go miner.GoogleCrawl(config.Google, &wg)
 	}
 
-	// 3. Crawl site with gocolly to find unindexed documents
+	// 3. Crawl site with GoColly to find unindexed documents
 	if config.Colly.Use {
 		wg.Add(1)
 		go miner.CollyCrawl(config.Colly, &wg)

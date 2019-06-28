@@ -52,7 +52,7 @@ type Companies struct {
 	NumDocs         *uint  `gorm:"default:0"`
 	NumHTML         *uint  `gorm:"default:0"`
 	Industry        string `sql:"type:integer REFERENCES Industries(industry)"`
-	IndustryGroup   string `sql:"type:integer REFERENCES IndustryGroups(industry_group)"`
+	IndustryGroups  string `sql:"type:integer REFERENCES IndustryGroups(industry_groups)"`
 	Businesses      string `sql:"type:integer REFERENCES Businesses(businesses)"`
 	Economics       string `sql:"type:integer REFERENCES Economics(economics)"`
 }

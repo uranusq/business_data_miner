@@ -1,4 +1,6 @@
-data/*
+data/colly/*
+data/google/*
+data/common/*
 aux.go
 *.pdf
 *.db
@@ -10,4 +12,3 @@ aux.go
 builds/*
 database_saves/*
 crawls/*
-data*
