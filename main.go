@@ -80,7 +80,11 @@ func (m Miner) CommonCrawl(config commonConfig, wg *sync.WaitGroup) {
 		waitTime := time.Second * time.Duration(config.SearchInterval)
 		start := time.Now()
 
-		go cc.FetchURLData(c.URL, saveFolder, resChan, config.Timeout, config.CrawlDB, config.WaitTime)
+		// Make config for parser
+		commonConfig := cc.Config{ResultChan: resChan, Timeout: config.Timeout, CrawlDB: config.CrawlDB,
+			WaitMS: config.WaitTime, Extensions: config.Extensions, MaxAmount: config.MaxAmount}
+
+		go cc.FetchURLData(c.URL, saveFolder, commonConfig)
 		workers++
 
 		// Wait time before proceed cycle
@@ -235,7 +239,12 @@ func (m Miner) CollyCrawl(config collyConfig, wg *sync.WaitGroup) {
 		if err != nil {
 			panic(err)
 		}
-		go CrawlSite(c.URL, saveFolder, config.MaxFileSize, config.MaxHTMLLoad, config.WorkMinutes, resChan)
+
+		// Make configuration for crawler
+		collyConfig := CollyConfig{ResChanel: resChan, MaxAmount: config.MaxAmount, Extensions: config.Extensions,
+			MaxFileSize: config.MaxFileSize, MaxHTMLLoad: config.MaxHTMLLoad, WorkMinutes: config.WorkMinutes, RandomizeName: config.RandomName}
+
+		go CrawlSite(c.URL, saveFolder, collyConfig)
 		workers++
 	}
 

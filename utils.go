@@ -101,3 +101,17 @@ func logToFile(location string) *log.Logger {
 	logger.Println("Log started\n-------------------------------")
 	return logger
 }
+
+// IsExtensionExist ...Return `true` if there is extension in allowed or false if there is no
+// returns `true` if length of `allowedExtensions` == 0
+func IsExtensionExist(allowedExtensions []string, extension string) bool {
+	if len(allowedExtensions) == 0 {
+		return true
+	}
+	for _, ext := range allowedExtensions {
+		if ext == extension {
+			return true
+		}
+	}
+	return false
+}

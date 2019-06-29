@@ -17,14 +17,29 @@ type CollyResultChan struct {
 	Done   bool
 }
 
-// CrawlSite ... Crawl choosen URL and saves found files
-func CrawlSite(urlSite string, saveto string, maxMB int, maxLoad uint, workMinutes int, resultChan chan CollyResultChan) {
-	url := "https://" + urlSite
+// CollyConfig ... Holds configuration parameters for Colly crawler
+type CollyConfig struct {
+	ResChanel     chan CollyResultChan
+	MaxFileSize   int
+	MaxHTMLLoad   uint
+	WorkMinutes   int
+	MaxAmount     int
+	Extensions    []string
+	RandomizeName bool
+}
 
+// CrawlSite ... Crawl choosen URL and saves found files
+func CrawlSite(urlSite string, saveto string, config CollyConfig) {
+	defer func() {
+		if r := recover(); r != nil {
+		}
+	}()
+
+	url := "https://" + urlSite
+	downloaded := 0
 	var loadedSize uint
-	maxLoadSize := maxLoad * 1024
-	waitTime := time.Minute * time.Duration(workMinutes)
-	exit := false
+	maxLoadSize := config.MaxHTMLLoad * 1024
+	waitTime := time.Minute * time.Duration(config.WorkMinutes)
 	c := cly.NewCollector()
 	c.AllowedDomains = []string{"www." + urlSite, "sso." + urlSite, urlSite, "s3.amazonaws.com"}
 	c.WithTransport(&http.Transport{
@@ -37,8 +52,9 @@ func CrawlSite(urlSite string, saveto string, maxMB int, maxLoad uint, workMinut
 		ResponseHeaderTimeout: 60 * time.Second,
 		ExpectContinueTimeout: 60 * time.Second,
 	})
+
 	// Reduce maximum response body size to 1M
-	size := int(1024 * 1024 * maxMB)
+	size := int(1024 * 1024 * config.MaxFileSize)
 	c.MaxBodySize = size
 
 	c.OnHTML("a[href]", func(e *cly.HTMLElement) {
@@ -51,33 +67,55 @@ func CrawlSite(urlSite string, saveto string, maxMB int, maxLoad uint, workMinut
 		//fmt.Println("[Visiting]", r.URL.String())
 	})
 	c.OnError(func(_ *cly.Response, err error) {
-		resultChan <- CollyResultChan{URL: url, Error: err}
+		config.ResChanel <- CollyResultChan{URL: url, Error: err}
 	})
 
 	start := time.Now()
 	c.OnResponse(func(r *cly.Response) {
 		elapsed := time.Since(start)
 		ext := ExtensionByContent(r.Body)
-		if elapsed > waitTime && !exit {
-			//fmt.Println(url, " time end")
-			resultChan <- CollyResultChan{URL: urlSite, Done: true, Loaded: loadedSize}
-			exit = true
-			return
+		// If colly worked more than set
+		if (elapsed > waitTime) || (downloaded >= config.MaxAmount) {
+			config.ResChanel <- CollyResultChan{URL: urlSite, Done: true, Loaded: loadedSize}
+			panic("Exit")
+
 		} else if ext == ".none" {
 			return
-		} else if loadedSize > maxLoadSize && ext != ".pdf" && ext != ".doc" {
+		} else if loadedSize > maxLoadSize && !IsExtensionExist(config.Extensions, ext) {
 			return
 		}
 		filename := EscapeURL(r.Request.URL.EscapedPath())
-		r.Save(saveto + "/" + filename + randString(6) + ext)
+		// Some root pages are nameless and will not display at filesystem
+		if filename == "" {
+			filename = "index"
+		}
+		if config.RandomizeName {
+			r.Save(saveto + "/" + filename + randString(6) + ext)
+		} else {
+			r.Save(saveto + "/" + filename + ext)
+		}
+
 		loadedSize += uint(len(r.Body) / 1024)
+		downloaded++
 	})
 
 	c.Visit(url)
+
 	// If it crawled less than 25 Kb - try again, but with `www.` domain
 	if loadedSize < 1024*25 {
 		url = "https://www." + urlSite
 		c.Visit(url)
 	}
-	resultChan <- CollyResultChan{URL: urlSite, Done: true, Loaded: loadedSize}
+
+	// Also try with HTTP, because some sites do not redirect
+	if loadedSize < 1024*25 {
+		url = "http://" + urlSite
+		c.Visit(url)
+	}
+	if loadedSize < 1024*25 {
+		url = "http://www." + urlSite
+		c.Visit(url)
+	}
+
+	config.ResChanel <- CollyResultChan{URL: urlSite, Done: true, Loaded: loadedSize}
 }
