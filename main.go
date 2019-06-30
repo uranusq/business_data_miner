@@ -120,22 +120,29 @@ func (m Miner) GoogleCrawl(config googleConfig, wg *sync.WaitGroup) {
 		done := 0
 		for r := range resChan {
 			if r.Error != nil {
-				logger.Printf("[GoogleCrawl] Error occured: %v\n", r.Error)
+				logger.Printf("Error occured [%v]: %v\n", r.URL, r.Error)
+				done++
+				workers--
+				innerWg.Done()
 			} else if r.Done {
 				m.db.GoogleFinished(r.URL)
 				logger.Printf("Google done: %v\n", r.URL)
 				done++
 				workers--
 				innerWg.Done()
+			} else if r.Warning != nil {
+				logger.Printf("Warning [%v]: %v\n", r.URL, r.Warning)
 			}
 
 			// Debug output
 			if config.Debug && r.Error != nil {
-				fmt.Printf("[GoogleCrawl] Error occured: %v\n", r.Error)
+				fmt.Printf("Error occured [%v]: %v\n", r.URL, r.Error)
 			} else if config.Debug && r.Progress > 0 {
 				fmt.Printf("Progress %v: %v/%v\n", r.URL, r.Progress, r.Total)
 			} else if config.Debug && r.Done {
 				fmt.Printf("Google done: %v\n", r.URL)
+			} else if config.Debug && r.Warning != nil {
+				fmt.Printf("Warning [%v]: %v\n", r.URL, r.Warning)
 			}
 
 			// If amount of `Dones` equal to amount of companies, then exit loop

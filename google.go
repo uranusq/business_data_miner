@@ -16,6 +16,7 @@ type GoogleResultChan struct {
 	URL      string
 	Progress int
 	Total    int
+	Warning  error
 	Error    error
 	Done     bool
 }
@@ -102,7 +103,11 @@ func googleResultParser(response *http.Response) ([]GoogleResult, error) {
 // GoogleScrape ...
 func GoogleScrape(searchTerm string, countryCode string, languageCode string) ([]GoogleResult, error) {
 	googleURL := buildGoogleURL(searchTerm, countryCode, languageCode)
+
 	res, err := googleRequest(googleURL)
+	buf := make([]byte, 1024)
+	res.Body.Read(buf)
+	fmt.Println(string(buf))
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +158,7 @@ func DownloadFile(saveto string, extension string, url string, maxMegabytes uint
 
 // FetchURLFiles ...
 func FetchURLFiles(url string, extension string, saveto string, maxMegabytes uint64, resultChan chan GoogleResultChan) {
-	// Query google
+	// Query google with filter
 	query := fmt.Sprintf("site:%v filetype:%v", url, extension)
 	res, err := GoogleScrape(query, "ru", "RU")
 	if err != nil {
@@ -161,12 +166,16 @@ func FetchURLFiles(url string, extension string, saveto string, maxMegabytes uin
 		return
 	}
 
+	if len(res) == 0 {
+		resultChan <- GoogleResultChan{Error: fmt.Errorf("[FetchURLFiles] no results found: %v", err), URL: url}
+		return
+	}
 	// Download found files
 	for i, r := range res {
 		DownloadFile(saveto, extension, r.ResultURL, maxMegabytes)
 		if err != nil {
-			resultChan <- GoogleResultChan{Error: fmt.Errorf("[FetchURLFiles] error: %v", err), URL: url}
-			return
+			resultChan <- GoogleResultChan{Warning: fmt.Errorf("[FetchURLFiles] error: %v", err), URL: url}
+			continue
 		}
 		resultChan <- GoogleResultChan{URL: url, Total: len(res), Progress: i + 1}
 	}
