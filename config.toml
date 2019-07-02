@@ -2,7 +2,7 @@
 database = "prod.db"    # Location of SQLite database
 
 [common]
-use = false                 # Use this crawler or not
+use = true                 # Use this crawler or not
 path = "data/common"         # Where collected data will be saved
 debug = false               # Show debug output
 extensions = [".html", ".pdf", ".doc", ".txt"]        # Which files to save. If empty - save all files
@@ -25,7 +25,7 @@ max_file_size = 35      # In megabytes
 workers = 40
 
 [colly]
-use = false
+use = true
 path = "data/colly"
 debug = false
 extensions = [".html", ".pdf", ".doc", ".txt"]       

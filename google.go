@@ -50,9 +50,9 @@ func buildGoogleURL(searchTerm string, countryCode string, languageCode string) 
 	searchTerm = strings.Replace(searchTerm, " ", "+", -1)
 	if googleBase, found := googleDomains[countryCode]; found {
 		return fmt.Sprintf("%s%s&num=100&hl=%s", googleBase, searchTerm, languageCode)
-	} else {
-		return fmt.Sprintf("%s%s&num=100&hl=%s", googleDomains["com"], searchTerm, languageCode)
 	}
+	return fmt.Sprintf("%s%s&num=100&hl=%s", googleDomains["com"], searchTerm, languageCode)
+
 }
 
 func googleRequest(searchURL string) (*http.Response, error) {
@@ -64,9 +64,9 @@ func googleRequest(searchURL string) (*http.Response, error) {
 
 	if err != nil {
 		return nil, err
-	} else {
-		return res, nil
 	}
+	return res, nil
+
 }
 
 func googleResultParser(response *http.Response) ([]GoogleResult, error) {
@@ -105,9 +105,7 @@ func GoogleScrape(searchTerm string, countryCode string, languageCode string) ([
 	googleURL := buildGoogleURL(searchTerm, countryCode, languageCode)
 
 	res, err := googleRequest(googleURL)
-	buf := make([]byte, 1024)
-	res.Body.Read(buf)
-	fmt.Println(string(buf))
+
 	if err != nil {
 		return nil, err
 	}

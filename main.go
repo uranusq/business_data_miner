@@ -31,7 +31,7 @@ func (m Miner) CommonCrawl(config commonConfig, wg *sync.WaitGroup) {
 	}
 
 	// Initialize variables
-	logger := logToFile(config.Path + "/log.txt")
+	logger := logToFile(config.Path + "/common_log.txt")
 	resChan := make(chan cc.Result)
 	companies := m.db.GetCommon()
 	workers := 0
@@ -108,7 +108,7 @@ func (m Miner) GoogleCrawl(config googleConfig, wg *sync.WaitGroup) {
 	}
 
 	// Initialize variables
-	logger := logToFile(config.Path + "/log.txt")
+	logger := logToFile(config.Path + "/google_log.txt")
 	resChan := make(chan GoogleResultChan)
 	companies := m.db.GetGoogle()
 	workers := 0
@@ -192,7 +192,7 @@ func (m Miner) CollyCrawl(config collyConfig, wg *sync.WaitGroup) {
 	}
 
 	// Initialize variables
-	logger := logToFile(config.Path + "/log.txt")
+	logger := logToFile(config.Path + "/colly_log.txt")
 	resChan := make(chan CollyResultChan)
 	companies := m.db.GetColly()
 	workers := 0
