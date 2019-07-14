@@ -1,24 +1,22 @@
 [general]
-database = "prod.db"    # Location of SQLite database
+database = "prod.db"        # Location of SQLite database
 
 [common]
-use = true                 # Use this crawler or not
-path = "data/common"         # Where collected data will be saved
+use = true                  # Use this crawler or not
+path = "data/common"        # Where collected data will be saved
 debug = false               # Show debug output
 extensions = [".html", ".pdf", ".doc", ".txt"]        # Which files to save. If empty - save all files
-max_amount = 100            # Limit amount of downloaded files
+max_amount = 100             # Limit amount of downloaded files
 timeout = 30                 # Query to Common Crawl Index API may take time
 search_interval = 2          # In seconds. Do not overload Index API server
 crawl_db = "CC-MAIN-2019-22" # Web Archive version 
-wait_time = 53               # In milliseconds. Wait time between loads from Amazon S3. If too fast may DoS
+wait_time = 53               # In milliseconds. Wait time between loads from Amazon S3
 workers = 40                 # Number of goroutines (threads) for this crawling method
-# hash_filter = false        # Save files with different hash than current files in folder. NOT IMPLEMENTED
-# random_name = false        # Add randmon prefix to file
 
 [google]
 use = true
 path = "data/google"
-debug = true
+debug = false
 extension = "pdf"       # Which files to search
 search_interval = 30    # In seconds
 max_file_size = 35      # In megabytes
@@ -34,4 +32,4 @@ max_file_size = 35      # In megabytes
 max_html_load = 50      # Total size of HTML files in folder. In megabytes
 work_minutes = 30
 workers = 10
-random_name = true     # Add randmon prefix to file
+random_name = true      # Add randmon prefix to file

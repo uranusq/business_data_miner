@@ -1,4 +1,3 @@
-// https://gist.github.com/EdmundMartin/eaea4aaa5d231078cb433b89878dbecf
 package main
 
 import (
